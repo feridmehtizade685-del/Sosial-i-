@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sosial İş Quiz Oyunu</title>
+<style>
+:root{--bg:#f3f6fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--accent:#4f46e5;--ok:#16a34a;--bad:#dc2626;--line:#e5e7eb}
+@media (prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--accent:#818cf8;--line:#334155}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px}
+.card{background:var(--card);width:100%;max-width:640px;border-radius:18px;padding:26px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+h1{margin:0 0 6px;font-size:1.6rem;text-align:center}
+.sub{text-align:center;color:var(--muted);margin:0 0 20px}
+.top{display:flex;justify-content:space-between;font-size:.9rem;color:var(--muted);margin-bottom:8px}
+.bar{height:8px;background:var(--line);border-radius:8px;overflow:hidden;margin-bottom:20px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+.lvl{display:inline-block;font-size:.8rem;padding:3px 10px;border-radius:20px;background:var(--accent);color:#fff;margin-bottom:10px}
+.q{font-size:1.2rem;font-weight:600;margin:0 0 16px;line-height:1.4}
+.opt{display:block;width:100%;text-align:left;padding:13px 15px;margin-bottom:10px;border:2px solid var(--line);border-radius:12px;background:transparent;color:var(--text);font-size:1rem;cursor:pointer;transition:.15s}
+.opt:hover:not(:disabled){border-color:var(--accent);transform:translateX(3px)}
+.opt:disabled{cursor:default}
+.opt.ok{border-color:var(--ok);background:rgba(22,163,74,.15)}
+.opt.bad{border-color:var(--bad);background:rgba(220,38,38,.12);animation:shake .4s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.btn{display:block;margin:14px auto 0;padding:12px 28px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-size:1rem;cursor:pointer}
+.hide{display:none}
+.msg{text-align:center;font-size:1.3rem;font-weight:700;color:var(--ok);height:0;overflow:hidden;opacity:0;transition:.3s}
+.msg.show{height:auto;opacity:1;margin-top:6px;animation:pop .6s}
+@keyframes pop{0%{transform:scale(.3)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.trophy{font-size:4rem;text-align:center;animation:pop .8s}
+.score{font-size:2.2rem;font-weight:800;text-align:center;color:var(--accent)}
+.res{text-align:center;color:var(--muted);margin:8px 0 6px}
+canvas{position:fixed;inset:0;pointer-events:none;z-index:10}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div class="card">
+  <div id="start">
+    <h1>🤝 Sosial İş Quiz</h1>
+    <p class="sub">15 sual · sadədən çətinə · hər düzgün cavab təbriklə qarşılanır</p>
+    <button class="btn" id="startBtn">Oyuna başla</button>
+  </div>
+  <div id="game" class="hide">
+    <div class="top"><span id="num"></span><span id="sc"></span></div>
+    <div class="bar"><i id="pb"></i></div>
+    <span class="lvl" id="lvl"></span>
+    <p class="q" id="q"></p>
+    <div id="opts"></div>
+    <div class="msg" id="msg"></div>
+    <button class="btn hide" id="next">Növbəti sual</button>
+  </div>
+  <div id="end" class="hide">
+    <div class="trophy" id="tr">🏆</div>
+    <h1>Oyun bitdi!</h1>
+    <div class="score" id="fs"></div>
+    <p class="res" id="fr"></p>
+    <button class="btn" id="again">Yenidən oyna</button>
+  </div>
+</div>
+
+<script>
+// Hər sualda ilk variant düzgün cavabdır; oyun zamanı variantlar qarışdırılır.
+const Q=[
+{l:"Asan",q:"Sosial işin əsas məqsədi nədir?",a:["İnsanların rifahını artırmaq və sosial dəstək göstərmək","Sosial cəhətdən müdafiə olunanları cəmiyyətdən təcrid etmək","Yalnız dövlət qurumlarının sənəd dövriyyəsini təşkil etmək","İnsanların şəxsi həyatına nəzarət və məhdudiyyət tətbiq etmək"]},
+{l:"Asan",q:"Sosial işi peşə kimi həyata keçirən mütəxəssis necə adlanır?",a:["Sosial işçi","Maliyyə auditoru","İnşaat mühəndisi","Rəqəmsal dizayner"]},
+{l:"Asan",q:"Sosial işdə “klient” kimdir?",a:["Sosial işçidən kömək və dəstək alan şəxs","Sosial xidmət müəssisəsinin yeni işə qəbul olunan işçisi","Sosial işçiyə maddi əməkhaqqı ödəyən şəxs","Sosial işçini yoxlayan dövlət müfəttişi"]},
+{l:"Asan",q:"Aşağıdakılardan hansı sosial işçinin fəaliyyət sahəsinə daxildir?",a:["Yetim uşaqlara və onların ailələrinə dəstək göstərmək","Binaların tikintisi üçün layihə sənədləri hazırlamaq","Xəstələrə cərrahi əməliyyat aparmaq","Şirkətlərin illik mühasibat hesabatını tərtib etmək"]},
+{l:"Asan",q:"Aşağıdakılardan hansı sosial işin etik prinsipidir?",a:["Klientin məlumatlarının məxfiliyinin qorunması","Klientin şəxsi sirlərinin üçüncü şəxslərə açılması","Klientin seçimlərinin tamamilə nəzərə alınmaması","Klientə münasibətdə ayrı-seçkilik göstərilməsi"]},
+{l:"Orta",q:"Sosial işin hansı səviyyəsi fərdlə və ailə ilə birbaşa işi nəzərdə tutur?",a:["Mikro səviyyə","Mezo səviyyə","Makro səviyyə","Qlobal səviyyə"]},
+{l:"Orta",q:"Sosial işdə “keys menecment” nədir?",a:["Ehtiyacların qiymətləndirilməsi, xidmətlərin əlaqələndirilməsi və izlənməsi","Sosial xidmətlərin yalnız kağız üzərində qeydiyyata alınması prosesi","Sosial müəssisənin maliyyə vəsaitlərinin bölüşdürülməsi qaydası","Klientlərin yaşayış yerləri üzrə siyahıya salınması üsulu"]},
+{l:"Orta",q:"Empatiya sosial işçi üçün nəyi ifadə edir?",a:["Başqasının hiss və təcrübəsini anlamaq və həssas yanaşmaq bacarığını","Başqasının qərarlarını öz fikrinə uyğunlaşdırmaq və yönəltmək bacarığını","Öz hisslərini gizlədib tam emosiyasız davranmaq bacarığını","Başqasının problemlərinə qiymət verib onu tənqid etmək bacarığını"]},
+{l:"Orta",q:"Sosial işdə insan hüquqlarına münasibət necədir?",a:["Peşənin əsas dəyər və etik əsasını təşkil edir","Yalnız xüsusi hallarda nəzərə alınan əlavə məsələdir","Sosial işçinin fəaliyyətinə heç bir təsiri olmayan anlayışdır","Yalnız hüquqşünasları maraqlandıran ayrıca sahədir"]},
+{l:"Orta",q:"Sosial işin müdaxilə prosesində ilk mərhələ hansıdır?",a:["Vəziyyətin və ehtiyacların ilkin qiymətləndirilməsi","Müdaxilənin nəticələrinin yekun qiymətləndirilməsi","Klient ilə işin rəsmi olaraq başa çatdırılması","Plan icrasının uzunmüddətli monitorinqi"]},
+{l:"Çətin",q:"Ekoloji (sistemlər) yanaşma fərdi necə nəzərdən keçirir?",a:["Ailə, icma və cəmiyyət mühiti ilə qarşılıqlı təsir daxilində","Ətraf mühitdən tam təcrid olunmuş müstəqil bir varlıq kimi","Yalnız irsi və bioloji xüsusiyyətlərinin cəmi şəklində","Yalnız keçmişdə yaşadığı hadisələrin birbaşa nəticəsi kimi"]},
+{l:"Çətin",q:"Maslou ehtiyaclar iyerarxiyasında ən aşağı pillə hansıdır?",a:["Fizioloji tələbatlar","Təhlükəsizlik tələbləri","Sosial əlaqə tələbləri","Özünütəsdiq tələbləri"]},
+{l:"Çətin",q:"Sosial işdə “advokasiya” nə deməkdir?",a:["Klientin hüquq və maraqlarını müdafiə etmək, səsini eşitdirmək","Klientin əvəzinə bütün qərarları tək qəbul edib icra etmək","Klientin problemini xidmətə yönləndirmədən bağlayıb arxivləşdirmək","Klientin şikayətlərini nəzərə almayıb prosesi sürətləndirmək"]},
+{l:"Çətin",q:"Sosial işdə supervizyia nədir?",a:["Təcrübəli mütəxəssislə peşəkar inkişaf məqsədli sistemli görüşlər","İşçilərin əməkhaqqının hesablanması və ödənilməsi sistemi","Klientlərin ərizələrinin arxivə təhvil verilməsi qaydası","İşçilərin işdən çıxarılması üçün cəza tədbirləri sistemi"]},
+{l:"Çətin",q:"Sosial işdə “etik dilemma” nədir?",a:["Bir neçə etik dəyərin toqquşduğu və çətin seçim tələb edən vəziyyət","Bütün qaydaların aydın şəkildə tək cavab verdiyi sadə vəziyyət","Klientin sosial işçiyə təşəkkür etdiyi xoş münasibət halı","Sosial işçinin iş yerini dəyişməsi ilə bağlı inzibati proses"]}
+];
+const PRAISE=["🎉 Təbriklər!","👏 Əla cavab!","🌟 Bravo!","💪 Möhtəşəm!","🏅 Çox gözəl!","✨ Afərin!"];
+const $=id=>document.getElementById(id);
+let i=0,score=0,locked=false;
+
+const shuffle=a=>{a=a.slice();for(let k=a.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[a[k],a[j]]=[a[j],a[k]]}return a};
+const show=id=>{["start","game","end"].forEach(x=>$(x).classList.toggle("hide",x!==id))};
+
+function render(){
+  locked=false;
+  const d=Q[i];
+  $("num").textContent=`Sual ${i+1} / ${Q.length}`;
+  $("sc").textContent=`Xal: ${score}`;
+  $("pb").style.width=(i/Q.length*100)+"%";
+  $("lvl").textContent="Səviyyə: "+d.l;
+  $("q").textContent=d.q;
+  $("msg").className="msg";
+  $("next").classList.add("hide");
+  const box=$("opts");box.innerHTML="";
+  shuffle(d.a.map((t,k)=>({t,ok:k===0}))).forEach(o=>{
+    const b=document.createElement("button");
+    b.className="opt";b.textContent=o.t;b.dataset.ok=o.ok;
+    b.onclick=()=>answer(b,o.ok);
+    box.appendChild(b);
+  });
+}
+
+function answer(btn,ok){
+  if(locked)return;locked=true;
+  document.querySelectorAll(".opt").forEach(b=>{
+    b.disabled=true;
+    if(b.dataset.ok==="true")b.classList.add("ok");
+  });
+  if(ok){
+    score++;$("sc").textContent=`Xal: ${score}`;
+    $("msg").textContent=PRAISE[Math.floor(Math.random()*PRAISE.length)];
+    $("msg").classList.add("show");
+    confetti();
+  }else btn.classList.add("bad");
+  $("next").textContent=i===Q.length-1?"Nəticəni gör":"Növbəti sual";
+  $("next").classList.remove("hide");
+}
+
+function finish(){
+  show("end");
+  $("fs").textContent=`${score} / ${Q.length}`;
+  const p=score/Q.length;
+  $("tr").textContent=p>=.8?"🏆":p>=.5?"🥈":"📚";
+  $("fr").textContent=p>=.8?"Əla nəticə! Sən sosial iş üzrə real mütəxəssissən!":p>=.5?"Yaxşı nəticə! Bir az da məşq etsən, mükəmməl olacaq.":"Narahat olma, yenidən cəhd et və öyrənməyə davam et!";
+  $("pb").style.width="100%";
+  if(p>=.5)confetti(true);
+}
+
+$("startBtn").onclick=()=>{i=0;score=0;show("game");render()};
+$("next").onclick=()=>{i++;i<Q.length?render():finish()};
+$("again").onclick=()=>{i=0;score=0;show("game");render()};
+
+// Konfeti animasiyası
+const cv=$("fx"),cx=cv.getContext("2d");let parts=[],run=false;
+function size(){cv.width=innerWidth;cv.height=innerHeight}
+addEventListener("resize",size);size();
+function confetti(big){
+  const n=big?220:120,cols=["#f43f5e","#f59e0b","#10b981","#3b82f6","#a855f7","#facc15"];
+  for(let k=0;k<n;k++)parts.push({x:innerWidth/2,y:innerHeight*.45,vx:(Math.random()-.5)*16,vy:-Math.random()*14-4,s:Math.random()*8+4,r:Math.random()*6,vr:(Math.random()-.5)*.3,c:cols[Math.floor(Math.random()*cols.length)],life:100+Math.random()*60});
+  if(!run){run=true;requestAnimationFrame(loop)}
+}
+function loop(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  parts=parts.filter(p=>p.life>0);
+  parts.forEach(p=>{p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;p.life--;
+    cx.save();cx.translate(p.x,p.y);cx.rotate(p.r);cx.fillStyle=p.c;cx.globalAlpha=Math.min(1,p.life/40);cx.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);cx.restore()});
+  if(parts.length)requestAnimationFrame(loop);else{run=false;cx.clearRect(0,0,cv.width,cv.height)}
+}
+</script>
+</body>
+</html>
